@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
-from io import BytesIO  # Necesario para manejar el archivo en memoria
+from io import BytesIO
 import os
 
 # --- 1. CONFIGURACIÓN DE PÁGINA ---
@@ -81,10 +81,21 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "💾 4. Exportar Datos"
 ])
 
-# Configuración de Dropdowns para las tablas
+# Configuración de las columnas desplegables (Dropdowns)
+config_surf = {
+    "Surf": st.column_config.SelectboxColumn(
+        "Surf",
+        options=["Concordante", "Discordante"],
+        required=True,
+    )
+}
+
 config_superficie = {
-    "Surf": st.column_config.SelectboxColumn("Superficie", options=["Concordante", "Discordante"], required=True),
-    "Superficie": st.column_config.SelectboxColumn("Superficie", options=["Concordante", "Discordante"], required=True)
+    "Superficie": st.column_config.SelectboxColumn(
+        "Superficie",
+        options=["Concordante", "Discordante"],
+        required=True,
+    )
 }
 
 with tab1:
@@ -101,7 +112,7 @@ with tab1:
         'TWT (s)': [1.305, 1.404, 1.416, 1.434],
         'Vel avg (m/s)': [4135, 4260, 4525, 5157]
     }
-    df_a_input = st.data_editor(pd.DataFrame(data_a), num_rows="dynamic", key="editor_a", use_container_width=True, column_config=config_superficie)
+    df_a_input = st.data_editor(pd.DataFrame(data_a), num_rows="dynamic", key="editor_a", use_container_width=True, column_config=config_surf)
 
 with tab2:
     st.header("Configuración de Pozo Pronóstico (B)")
@@ -127,13 +138,15 @@ with tab3:
         'TWT Real (s)': [1.270, 1.400, 1.410, 1.430],
         'TVDSS Real (m)': [1927, 2100, 2150, 2200]
     }
-    df_real_input = st.data_editor(pd.DataFrame(data_r), num_rows="dynamic", key="editor_r", use_container_width=True, column_config=config_superficie)
+    df_real_input = st.data_editor(pd.DataFrame(data_r), num_rows="dynamic", key="editor_r", use_container_width=True, column_config=config_surf)
 
 with tab4:
     st.header("Exportación de Resultados")
+    nombre_ref = st.text_input("Nombre Pozo Referencia:", "Pozo A")
     nombre_pre = st.text_input("Nombre Pozo Pronóstico:", "Pozo B")
     interprete = st.text_input("Nombre del Intérprete:", "")
-    st.write("El archivo se generará después de realizar el análisis.")
+    
+    st.info("Para exportar, primero debe generar el análisis abajo.")
 
 # --- 4. EJECUCIÓN DEL ANÁLISIS ---
 st.markdown("---")
@@ -193,26 +206,23 @@ if st.button("📊 GENERAR ANÁLISIS COMPLETO", use_container_width=True, type="
 
         st.pyplot(fig)
         
-        # --- TABLA DE RESULTADOS ---
+        # Mostrar tablas de resultados debajo
         st.subheader("📋 Resultados del Pronóstico")
         st.dataframe(res_b[['Cima', 'Prediccion_Base', 'Prop_Min', 'Prop_Max', 'err_prop_capa']], use_container_width=True)
 
-        # --- LÓGICA DE EXPORTACIÓN (CORRECCIÓN) ---
+        # Preparar Excel para descarga
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            res_b.to_excel(writer, index=False, sheet_name='Pronostico_B')
-            df_a_res.to_excel(writer, index=False, sheet_name='Referencia_A')
-            
-        # El botón de descarga aparece en la pestaña 4 después de calcular
-        with tab4:
-            st.success("✅ Análisis listo para descargar")
-            st.download_button(
-                label="📥 DESCARGAR EXCEL DE RESULTADOS",
-                data=output.getvalue(),
-                file_name=f"Pronostico_{nombre_pre}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+            res_b.to_excel(writer, index=False, sheet_name='Pronostico')
+            df_a_res.to_excel(writer, index=False, sheet_name='Referencia')
+        
+        st.sidebar.download_button(
+            label="📥 Descargar Resultados (Excel)",
+            data=output.getvalue(),
+            file_name=f"Pronostico_{nombre_pre}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     except Exception as e:
         st.error(f"Error en el procesamiento: {e}")
+
